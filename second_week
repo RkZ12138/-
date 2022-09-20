@@ -1,0 +1,118 @@
+import pandas as pd
+import jieba
+import math
+import numpy as np
+import random
+from sklearn.metrics.pairwise import cosine_similarity
+from PIL import Image
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+
+#分词并过滤停用词函数
+def seperate(danmulist,stopwordslist):
+    words=','.join((danmulist))
+    jieba.load_userdict(stopwordslist)
+    words_sep=[w for w in jieba.lcut(words,cut_all=False) if w not in stopwordslist]
+    return words_sep
+
+#统计词频函数
+def word_freq(wordslist):
+    freq={}
+    for w in wordslist:
+        count=freq.get(w,0)
+        freq[w]=count+1
+    return freq
+
+# 特征词函数（出现次数不小于5）
+def highchar(freq_dic):
+    highfreq={}
+    for w in freq_dic:
+        if freq_dic[w]>=5: highfreq[w]=freq_dic[w]
+    highfreq= dict(sorted(highfreq.items(), key=lambda x: x[1],reverse=True)) #降序的特征词字典
+    highfreq_w=[] #特征词集合
+    for i in highfreq: highfreq_w.append(i)
+    return highfreq_w
+
+#特征向量函数
+def vector_cre(danmulist,highfreq_wlist):
+    vector={}
+    for i in range(len(danmulist)):
+        l=[]
+        for w in highfreq_wlist:
+            if w in danmulist[i]: l.append(1)
+            else: l.append(0)
+        vector[danmulist[i]]=l
+
+    return vector
+
+#欧几里得距离函数
+def dis_sim(a,b):
+    distance=0
+    for i in range(len(a)):
+        distance+=(a[i]-b[i])**2
+    return math.sqrt(distance)
+#余弦相似度函数
+def cos_sim(a, b):
+    vec1 = np.array(a)
+    vec2 = np.array(b)
+    cos_sim = cosine_similarity(vec1.reshape(1, -1), vec2.reshape(1, -1))
+    return cos_sim[0][0]
+
+#词top50云图函数
+def wordcloud50(word_dic):
+    font="C:\Windows\Fonts\simhei.ttf"
+    word_dic50={}
+    for i in range(50):
+        word_dic50[list(word_dic.keys())[i]]=list(word_dic.values())[i]
+    mask = np.array(Image.open("D:\桌面文件夹\大三上\现代程序设计技术\week2\picture.png"))
+    wordcloud = WordCloud(font_path=font,background_color="white",width =4000,height= 2000,margin= 10,mask=mask).fit_words(word_dic50)
+    plt.imshow(wordcloud)
+    plt.axis('off')
+    plt.show()
+
+def main():
+    path_danmu = 'D:\桌面文件夹\大三上\现代程序设计技术\week2\danmuku_test.csv'
+    data = pd.read_csv(path_danmu)  # 读取文件中所有数据
+    danmu = list(data['content'])  # 读取第一列
+    path_stopwords = "D:\桌面文件夹\大三上\现代程序设计技术\week2\stopwords_list.txt"
+    f = open(path_stopwords, "r", encoding="utf-8-sig")
+    stopwords = f.read().splitlines()  # split()的话就忽略了空格
+    danmu_filtered=[] #过滤过短弹幕
+    for w in danmu:
+        if len(w)>4:
+            danmu_filtered.append(w)
+
+    danmu_sep = seperate(danmu_filtered, stopwords)  # 分词结果
+    print("分词结果：",danmu_sep)
+
+    freq = word_freq(danmu_sep)  # 词频字典
+    print("词频统计：",freq)
+    high=[]
+    low=[]
+    #各观察三个
+    for w in freq.keys():
+        if freq[w]>=5: high.append(w)
+        else: low.append(w)
+        if len(high)>2 and len(low)>2: break
+    print("高频词举例：",high,"低频词举例：",low)
+
+    highfreq_w = highchar(freq)  # 降序排列的高频特征词列表
+    print("降序排列的特征词列表：",highfreq_w)
+    vector = vector_cre(danmu_filtered, highfreq_w)  # 弹幕向量
+    print("弹幕特征向量：",vector)
+    i=0
+    n=len(danmu_filtered)
+    while i<50:
+        j=random.randint(0,n-1) #竟然包括n!!!!
+        k=random.randint(0,n-1)
+        distance=dis_sim(vector[danmu_filtered[j]],vector[danmu_filtered[k]])
+        cos=cos_sim(vector[danmu_filtered[j]],vector[danmu_filtered[k]])
+        print(danmu_filtered[j],"与",danmu_filtered[k],"的欧几里得距离为",distance)
+        print(danmu_filtered[j],"与",danmu_filtered[k],"余弦相似度为",cos)
+        i=i+1
+
+    wordcloud50(freq)
+
+
+if __name__ == '__main__':
+    main()
